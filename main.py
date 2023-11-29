@@ -64,8 +64,9 @@ def fetch_chat_models():
     response = requests.get('https://api.naga.ac/v1/models', headers=headers)
     if response.status_code == 200:
         ModelsData = response.json()
+        print("status code: " + str(response.status_code))
         for model in ModelsData.get('data'):
-            if "chat" in model['endpoints'][0]:
+            if "gpt" in model['id'][0]:
                 models.append(model['id'])
     else:
         print(f"Failed to fetch chat models. Status code: {response.status_code}")
@@ -92,8 +93,6 @@ async def on_ready():
     print(f"\033[1;38;5;202mAvailable models: {model_blob}\033[0m")
     print(f"\033[1;38;5;46mCurrent model: {config['GPT_MODEL']}\033[0m")
 
-    # Start the scheduler task
-    scheduler.start()
 
     if presences_disabled:
         return
@@ -121,8 +120,7 @@ MAX_HISTORY = config['MAX_HISTORY']
 personaname = config['INSTRUCTIONS'].title()
 replied_messages = {}
 active_channels = {}
-scheduled_channels = {}
-channels_scheduled_tasks = {}
+
 @bot.event
 async def on_message(message):
     if message.author == bot.user and message.reference:
@@ -233,31 +231,6 @@ async def toggledm(ctx):
     global allow_dm
     allow_dm = not allow_dm
     await ctx.send(f"DMs are now {'on' if allow_dm else 'off'}", delete_after=3)
-
-@bot.hybrid_command(name="schedule")
-@app_commands.choices(task=[
-    app_commands.Choice(name="Generate github reports", value="github"),
-    app_commands.Choice(name="Say hello", value="hello")
-])
-
-async def schedule_task(ctx, task: app_commands.Choice[str] = None):
-    channel_id = ctx.channel.id
-
-    if channel_id in scheduled_tasks["git-report"]:       
-       scheduled_tasks["git-report"].remove(channel_id)
-       with open("channels_scheduled_tasks.json", "w", encoding='utf-8') as f:
-            json.dump(scheduled_tasks, f, indent=4)
-       await ctx.send(f"{ctx.channel.mention} scheduled a git report has been disabled", delete_after=3)
-    else:
-        scheduled_tasks["git-report"].append(channel_id)
-        with open("channels_scheduled_tasks.json", "w", encoding='utf-8') as f:
-            json.dump(scheduled_tasks, f, indent=4)
-        await ctx.send(f"{ctx.channel.mention} scheduled a git report every day", delete_after=3)
-
-if os.path.exists("channels_scheduled_tasks.json"):
-    with open("channels_scheduled_tasks.json", "r", encoding='utf-8') as f:
-        scheduled_tasks = json.load(f)
-
 
 @bot.hybrid_command(name="toggleactive", description=current_language["toggleactive"])
 @app_commands.choices(persona=[
@@ -525,40 +498,6 @@ async def server(ctx):
 
     await ctx.send(embed=embed, ephemeral=True)
     
-
-
-# Define the scheduler task
-@tasks.loop(hours=48)  # Run the task every minute
-async def scheduler():
-    current_time = datetime.datetime.now()
-    print(current_time, "; hour is: ", current_time.hour)
-
-    if os.path.exists("channels_scheduled_tasks.json"):
-        with open("channels_scheduled_tasks.json", "r", encoding='utf-8') as f:
-            scheduled_channels = json.load(f)["git-report"]
-
-            print(scheduled_channels)
-
-        if scheduled_channels:
-            report = generate_trending_git_report()
-
-            for channel_id in scheduled_channels:
-                channel = bot.get_channel(channel_id)
-                if channel:
-                    # Send the message
-                    await channel.send(report)
-
-
-        # for channel_id in scheduled_channels:
-        #     # Replace 'YOUR_CHANNEL_ID' with the actual channel ID where you want to send the message
-        #     channel = bot.get_channel("1153297683235209286")
-            
-        #     # Send the message
-        #     await channel.send('Hello!')
-            # Check if it's time to send the message (e.g., 9:00 AM)
-            # if now.hour == 9 and now.minute == 0:
-
-
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
