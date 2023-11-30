@@ -1,38 +1,64 @@
 import aiohttp
 import io
-from datetime import datetime
 import time
 import random
-from urllib.parse import quote
-from bot_utilities.config_loader import load_current_language, config
-import openai
 import os
-from dotenv import find_dotenv, load_dotenv
 import json
+import requests
+import openai
 
-from langchain.agents import initialize_agent, AgentType, Tool
-from langchain.chains import LLMMathChain
-from langchain.chat_models import ChatOpenAI
+# Importing from bs4 and pydantic
+from bs4 import BeautifulSoup
+from pydantic import Field
+from urllib.parse import quote
+from datetime import datetime
+from dotenv import find_dotenv, load_dotenv
+from bot_utilities.config_loader import load_current_language, config
+
+# Importing from langchain
 from langchain.llms import OpenAI
-from langchain.prompts import MessagesPlaceholder
+from langchain.agents import initialize_agent, AgentType, Tool
+from langchain.chains import LLMMathChain, ConversationalRetrievalChain
+from langchain.chains.summarize import load_summarize_chain
+from langchain.chat_models import ChatOpenAI
+from langchain.document_loaders import DirectoryLoader
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.indexes import VectorstoreIndexCreator
+from langchain.indexes.vectorstore import VectorStoreIndexWrapper
+from langchain.vectorstores import Chroma
+from langchain.prompts import MessagesPlaceholder, ChatPromptTemplate, PromptTemplate
 from langchain.schema import SystemMessage
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.chains.summarize import load_summarize_chain
-from langchain.prompts import ChatPromptTemplate
-from langchain.prompts import PromptTemplate
 
-from bs4 import BeautifulSoup
-from pydantic import Field
-
-import requests
 
 
 load_dotenv(find_dotenv())
 openai.api_key = os.getenv("OPENAI_API_KEY")
-load_dotenv()
+
 current_language = load_current_language()
-internet_access = config['INTERNET_ACCESS']
+
+
+# Global variable to keep track of the retrieval index
+retrieval_index = None
+
+def create_retrieval_index(persist=True):
+    """
+    Create or load the retrieval index.
+    """
+    global retrieval_index
+    if persist and os.path.exists("persist"):
+        print("Reusing index...\n")
+        vectorstore = Chroma(persist_directory="persist", embedding_function=OpenAIEmbeddings())
+        retrieval_index = VectorStoreIndexWrapper(vectorstore=vectorstore)
+    else:
+        loader = DirectoryLoader("data/")
+        if persist:
+            retrieval_index = VectorstoreIndexCreator(vectorstore_kwargs={"persist_directory": "persist"}).from_loaders([loader])
+        else:
+            retrieval_index = VectorstoreIndexCreator().from_loaders([loader])
+
+
 
 ## To Do - Does not work
 ## Add embeddings here
@@ -244,11 +270,18 @@ def create_agent(id, user_name, ai_name, instructions):
     )
 
     agents[id] = agent
+
+    print("Agent " + str(agent) + " created")
     
     return agent
 
-
 def generate_response(instructions, user_input):   
+    message_history = {} # should be defined as global variable in main.py
+    global retrieval_index
+
+    if retrieval_index is None:
+        create_retrieval_index(persist=True)
+
     id = user_input["id"]    
     message = user_input["message"]
 
@@ -256,28 +289,21 @@ def generate_response(instructions, user_input):
         user_name = user_input["user_name"]
         ai_name = user_input["ai_name"]
         agent = create_agent(id, user_name, ai_name, instructions)
+        # Initialize message_history for a new id
+        message_history.setdefault(id, [])
     else:
         agent = agents[id]
+
+    # Create the ConversationalRetrievalChain
+    chain = ConversationalRetrievalChain.from_llm(
+        llm=ChatOpenAI(model="gpt-3.5-turbo"),
+        retriever=retrieval_index.vectorstore.as_retriever(search_kwargs={"k": 1}),
+    )
     
-    print(message)
-    response = agent.run(message)
+    # Generate response and append to chat history
+    chat_history = message_history.get(id, [])  # Get chat history or an empty list
+    result = chain({"question": message, "chat_history": chat_history})
+    response = result['answer']
+    message_history.setdefault(id, []).append((message, response))
 
     return response
-
-
-def generate_response_old(instructions, search, history):
-    if search is not None:
-        search_results = search
-    elif search is None:
-        search_results = "Search feature is disabled"
-    messages = [
-            {"role": "system", "name": "instructions", "content": instructions},
-            *history,
-            {"role": "system", "name": "search_results", "content": search_results},
-        ]
-    response = openai.ChatCompletion.create(
-        model=config['GPT_MODEL'],
-        messages=messages
-    )
-    message = response.choices[0].message.content
-    return message

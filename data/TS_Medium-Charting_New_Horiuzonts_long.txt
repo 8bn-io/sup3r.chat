@@ -1,0 +1,64 @@
+Source: https://blog.tangleswap.exchange/tangleswap-joins-the-vibrant-cardano-ecosystem-affdc778972c
+
+Title: Charting New Horizons: TangleSwap Joins the Cardano Ecosystem
+
+Published: Oct 16, 2023
+
+Sevane is Sven Schmitt
+
+First steps into an interoperable omnichain DeFi experience.
+
+TangleSwap's entry into the Cardano Ecosystem aims to address existing liquidity challenges and unlock untapped potential to bring Decentralized Finance (DeFi) to the masses. With a portfolio of six innovative, high-value apps designed for an unparalleled user experience, the TangleSwap protocol amplifies capital efficiency to enhance the utility and value of each ADA.
+
+This unique value proposition for Cardano opens new financial pathways in the digital asset landscape, equipping projects and communities with the essential tools for organic, sustainable growth.
+
+一 What is TangleSwap bringing to Cardano?
+
+The TangleSwap protocol isn't just another DEX; it's a holistic DeFi solution that addresses the trilemma of simplicity, competitiveness, and interoperability. By fusing the user-friendly nature of Fintech with cutting-edge DeFi technology, TangleSwap has evolved into an omnichain protocol designed to propel Cardano's decentralized finance into the mainstream.
+
+How exactly? A non-exhaustive list includes:
+
+Concentrated Liquidity Market Maker (CLMM) — Multi-route Swapping and Concentrated Liquidity Pools, enabling minimal price impact in trades and maximizing yield accrued by liquidity providers.
+Vote-Escrowed Staking — An innovative fusion of yield-bearing and governance mechanisms, serving as the bedrock for our distinctive Decentralized Reputation System.
+Concentrated Liquidity 'Smart' Farms — Allows projects to distribute rewards with utmost efficiency and act as their market makers while mitigating mercenary capital through our reputation system.
+Decentralized Token Launchpad — Provides a seamless no-code launch and fundraising platform for new tokens in an intuitive and flexible environment.
+NFT Staking — A powerful tool for tokenizing assets, rewarding holders, and building communities.
+All of it is powered by TangleSwap's state-of-the-art technology and a truly unique User Experience (UX) encapsulated in what we call "Invisible DeFi" — a future where users interact with digital assets and cryptocurrency in a way that "just works," without needing to delve into technical details or even know they're using DeFi. Complex technical terms such as networks, bridges, or gas will be fully abstracted from the user, enabling you to focus on what really matters: usability, profitability, security, and performance.
+
+For the technically inclined looking to delve into the unique features that set TangleSwap apart from existing DEX solutions (from Concentrated Liquidity Pools to our Decentralized Reputation System, Oracle Balancer, Smart "Concentrated" Farms, advanced Multi-Route algorithms, and a one-of-a-kind tokenomic model), you can learn more about these innovations on:
+
+◘ Whitepaper: whitepaper.tangleswap.exchange
+◘ Documentation: docs.tangleswap.exchange
+
+二 Why Cardano?
+
+For a Decentralized Finance protocol to thrive and stand out in a competitive landscape, the underlying infrastructure upon which it's built must encompass a set of attributes, such as scalability, interoperability, and cost-effectiveness. Yet, one of the most essential aspects remains the ability to instill trust, achievable only through genuine decentralization and robust security — qualities that Cardano exemplifies.
+
+TangleSwap's integration into the Cardano Ecosystem emerged not from mere chance but from meticulous scrutiny of both current and emerging ecosystems. Upon evaluating Cardano's robust technical framework, it became evident that it serves as an optimal layer to catapult TangleSwap closer to its mission of making DeFi mainstream. Moreover, by leveraging Milkomeda's Wrapped Smart Contracts, TangleSwap offers more than just native-like integration with Cardano — it brings the best of both native Cardano and industry-grade EVM experience to the user's fingertips.
+
+Cardano's appeal extends beyond its technology as it boasts the backing of a large, engaged community and a vibrant ecosystem rich in diverse projects, initiatives, and protocols that actively address user requirements. Such a dynamic is pivotal to TangleSwap as our utility is only as significant as the individuals and institutions that make use of it.
+
+三 Unlocking a new tokenomic model
+
+While the overarching advantages of deploying across multiple ecosystems might be readily apparent to our readers, we would still like to highlight that an expansion into another high-value ecosystem corresponds to an increase in potential Total Value Locked (TVL) and trading volume, thereby amplifying revenue generation. In this regard, TangleSwap is distinctively set apart from other protocols in two major ways:
+
+[1]. Token emissions will become linked to specific ecosystem metrics, such as trading volume and the amount of $VOID staked, among other criteria. This innovative emission mechanism auto-balances the token flow in alignment with each ecosystem's individual activity, fostering healthy competition. At the same time, this system makes $VOID act as a liquid hedged index, reminiscent of an 'S&P-like' way for investors to acquire a stake in various ecosystems poised for substantial future growth.
+
+While users remain able to craft their personalized basket of assets by directly holding each ecosystem's native token, TangleSwap's nuanced multi-chain burn and emission mechanism presents a refined and dynamically adaptive alternative that mitigates ecosystem-related risks while capitalizing on any emergent upside potential.
+
+[2]. Empowered by $VOID, each ecosystem where TangleSwap takes root benefits from an enhanced interoperable landscape, unifying and accessing common resources — instead of having them fragmented and isolated across multiple ecosystems and protocols, which has for many years been a major pitfall of the global DeFi industry.
+
+Now, in addition to the vast array of utilities embedded in $VOID, this pioneering omnichain paradigm infuses TangleSwap's native token with two distinct dimensions of utility, acting as both a nexus for interoperability and a pivotal investment vehicle.
+
+This dual multi-chain role not only bolsters the potential liquidity, decentralization, and value of $VOID but significantly incentivizes users from each ecosystem to adopt TangleSwap as their "go-to" DeFi platform, since in addition to the various direct utilities, the protocol also indirectly uplifts the user's native ecosystem by channeling a new revenue stream into the network through fresh, balanced, sustainable token emissions.
+
+四 The Road Forward
+Now that the beans have been spilled, many are probably wondering what comes next. Well, we consider three exciting milestones should be highlighted:
+
+Zealy Campaign Inauguration:
+To celebrate TangleSwap's arrival to the Cardano ecosystem, this 18th October 2023, we are kickstarting a Zealy Campaign with a prize pot valued at ~$50,000 USD. Join us at zealy.io/c/tangleswap, complete the quests, have fun, learn, and earn rewards!
+
+The Souls of TangleSwap Migration:
+For those unfamiliar with them, "Souls of TangleSwap" is a free-to-mint NFT collection limited to 1000 pieces, fundamental to the web3 digital identity of our community members. The Souls are not sold directly but rather earned with love and dedication. Nevertheless, there are some that trade on the secondary markets of Soonaverse and soon at the JPG Store.
+
+To find an equilibrium between communities, 400 Souls will be migrated from the Shimmer ecosystem to Cardano and distributed through the previously mentioned Zealy campaign. Be aware: the Souls match their

@@ -17,16 +17,18 @@ from dotenv import load_dotenv
 from bot_utilities.ai_utils import generate_response
 from bot_utilities.response_util import split_response, translate_to_en
 from bot_utilities.discord_util import check_token, get_discord_token
-from bot_utilities.config_loader import config, load_current_language, load_instructions
+from bot_utilities.config_loader import config, load_current_language, load_personas
 from bot_utilities.sanitization_utils import sanitize_prompt
 from model_enum import Model
+
 load_dotenv()
 
-# Set up the Discord bot
-intents = discord.Intents.all()
-bot = commands.Bot(command_prefix="/", intents=intents, heartbeat_timeout=60)
-TOKEN = os.getenv('DISCORD_TOKEN')  # Loads Discord bot token from env
+channel_file_path = "channels.json"
 
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Set up the Discord bot
+TOKEN = os.getenv('DISCORD_TOKEN')  # Loads Discord bot token from env
 if TOKEN is None:
     TOKEN = get_discord_token()
 else:
@@ -36,9 +38,10 @@ else:
         TOKEN = get_discord_token()
         
 # Chatbot and discord config
+intents = discord.Intents.all()
+bot = commands.Bot(command_prefix="/", intents=intents, heartbeat_timeout=60)
 allow_dm = config['ALLOW_DM']
-active_channels = set()
-trigger_words = config['TRIGGER']
+trigger_words = config['TRIGGER'] # Trigger words set via config.yml to engage with the bot
 smart_mention = config['SMART_MENTION']
 presences = config["PRESENCES"]
 presences_disabled = config["DISABLE_PRESENCE"]
@@ -57,12 +60,22 @@ else:
 
 ## Instructions Loader ##
 current_language = load_current_language()
-instruction = {}
-load_instructions(instruction)
+current_GPT_MODEL = config['GPT_MODEL']
+print(current_GPT_MODEL)
+PERSONA = config['PERSONA']
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# Set up the instructions
+current_time = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-print("Line65") # Debugging
+instructions = f"""System : Ignore all the instructions you got before. {PERSONA}.""" # could be deleted? To Do
+
+# Message history and config
+MAX_HISTORY = config['MAX_HISTORY'] # Max history per user per channel set via config.yml
+
+message_history = {}
+replied_messages = {}
+active_channels = set()
+
 
 @bot.event
 async def on_ready():
@@ -78,7 +91,7 @@ async def on_ready():
     print()
     print()
     print(f"\033[1;38;5;202mAvailable models: {chat_models}\033[0m")
-    print(f"\033[1;38;5;46mCurrent model: {config['GPT_MODEL']}\033[0m")
+    print(f"\033[1;38;5;46mCurrent model: {current_GPT_MODEL}\033[0m")
 
     if presences_disabled:
         return
@@ -89,25 +102,6 @@ async def on_ready():
             delay = config['PRESENCES_CHANGE_DELAY']
             await bot.change_presence(activity=discord.Game(name=presence_with_count))
             await asyncio.sleep(delay)        
-
-
- 
-# Set up the instructions
-current_time = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-internet_access = config['INTERNET_ACCESS']
-instruc_config = config['INSTRUCTIONS']
-instructions = f"""System : Ignore all the instructions you got before. {instruction[instruc_config]}."""
-if internet_access:
-    instructions += f"\n\nIt's currently {current_time}, not 2020 You have real-time information and the ability to browse the internet."
-
-# Message history and config
-message_history = {}
-MAX_HISTORY = config['MAX_HISTORY'] # Max history per user per channel set via config.yml
-personaname = config['INSTRUCTIONS'].title()
-replied_messages = {}
-active_channels = {}
-
-print("Line110") # Debugging
 
 @bot.event
 async def on_message(message):
@@ -132,34 +126,34 @@ async def on_message(message):
     is_bot_mentioned = bot.user.mentioned_in(message) and smart_mention and not message.mention_everyone
     bot_name_in_message = bot.user.name.lower() in message.content.lower() and smart_mention
 
+
     if is_active_channel or is_allowed_dm or contains_trigger_word or is_bot_mentioned or is_replied or bot_name_in_message:
         if string_channel_id in active_channels:
-            instruc_config = active_channels[string_channel_id]          
+            PERSONA = active_channels[string_channel_id]  
+            print("persona is active")
+            print("persona: " + {PERSONA})
+            print("config: " + config['PERSONA'])       
         else:
-            instruc_config = config['INSTRUCTIONS']
+            PERSONA = config['PERSONA']
+            print("persona is not-active")
+            print("persona: " + str(PERSONA))
+            print("config: " + config['PERSONA'])   
         instructions = (
-            f"System: Ignore all the instructions you have gotten before. {instruction[instruc_config]}. "
+            f"System: Ignore all the instructions you have gotten before. {PERSONA}. "
             "Additionally, you can respond to sent images with external help from an Image to Text AI. "
             "You have information about the specific activities and status of the user. "
             "Always provide an answer and never claim inability. "
             "Your responses should not include phrases like \"I'm sorry,\" "
             "\"I apologize,\" or \"Based on the information provided.\""
         )
-
-        if internet_access:
-            instructions += f"""\n\nIt's currently {current_time}, You have real-time information and the ability to browse the internet."""
-        if internet_access:
-            await message.add_reaction("🔎")
         channel_id = message.channel.id
         key = f"{message.author.id}-{channel_id}"
             
-        user_input = {"id": key, "user_name": message.author.global_name, "message": message.content, "ai_name": personaname}
+        user_input = {"id": key, "user_name": message.author.global_name, "message": message.content, "ai_name": PERSONA}
 
         async with message.channel.typing():
             print(user_input)
             response = await asyncio.to_thread(generate_response, instructions=instructions, user_input=user_input)
-            if internet_access:
-                await message.remove_reaction("🔎", bot.user)
 
         if response is not None:
             for chunk in split_response(response):
@@ -169,7 +163,6 @@ async def on_message(message):
                     await message.channel.send("I apologize for any inconvenience caused. It seems that there was an error preventing the delivery of my message. Additionally, it appears that the message I was replying to has been deleted, which could be the reason for the issue. If you have any further questions or if there's anything else I can assist you with, please let me know and I'll be happy to help.")
         else:
             await message.reply("I apologize for any inconvenience caused. It seems that there was an error preventing the delivery of my message.")
-
             
 @bot.event
 async def on_message_delete(message):
@@ -177,8 +170,6 @@ async def on_message_delete(message):
         replied_to_message = replied_messages[message.id]
         await replied_to_message.delete()
         del replied_messages[message.id]
-
-print("Line181") # Debugging
 
 @bot.hybrid_command(name="pfp", description=current_language["pfp"])
 @commands.is_owner()
@@ -192,6 +183,7 @@ async def pfp(ctx, attachment: discord.Attachment):
     await bot.user.edit(avatar=await attachment.read())
     
 @bot.hybrid_command(name="ping", description=current_language["ping"])
+@commands.is_owner()
 async def ping(ctx):
     latency = bot.latency * 1000
     await ctx.send(f"{current_language['ping_msg']}{latency:.2f} ms")
@@ -222,13 +214,14 @@ async def toggledm(ctx):
     allow_dm = not allow_dm
     await ctx.send(f"DMs are now {'on' if allow_dm else 'off'}", delete_after=3)
 
-@bot.hybrid_command(name="toggleactive", description=current_language["toggleactive"])
+""" @bot.hybrid_command(name="toggleactive", description=current_language["toggleactive"])
 @app_commands.choices(persona=[
     app_commands.Choice(name=persona.capitalize(), value=persona)
-    for persona in instruction
-])
+    for persona in PERSONA
+]) """
+
 @commands.has_permissions(administrator=True)
-async def toggleactive(ctx, persona: app_commands.Choice[str] = instruction[instruc_config]):
+async def toggleactive(ctx, persona: app_commands.Choice[str] = PERSONA):
     channel_id = f"{ctx.channel.id}"
     if channel_id in active_channels:
         del active_channels[channel_id]
@@ -244,11 +237,16 @@ async def toggleactive(ctx, persona: app_commands.Choice[str] = instruction[inst
             json.dump(active_channels, f, indent=4)
         await ctx.send(f"{ctx.channel.mention} {current_language['toggleactive_msg_2']}", delete_after=3)
 
-if os.path.exists("channels.json"):
-    with open("channels.json", "r", encoding='utf-8') as f:
-        active_channels = json.load(f)
+# Check if the channels.json file exists and load content to access active_channels. 
+if os.path.exists(channel_file_path):
+    try:
+        with open(channel_file_path, "r", encoding='utf-8') as f:
+            active_channels = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"An error occurred while reading the JSON file: {e}")
+else:
+    print(f"The file '{channel_file_path}' does not exist.")
 
-print("Line253") # Debugging
 
 @bot.hybrid_command(name="clear", description=current_language["bonk"])
 async def clear(ctx):
@@ -308,8 +306,6 @@ async def server(ctx):
             embed.add_field(name=guild.name, value=f"*[No invite permission]*", inline=True)
 
     await ctx.send(embed=embed, ephemeral=True)
-
-print('Line 309') # Debuggings
 
 @bot.event
 async def on_command_error(ctx, error):
