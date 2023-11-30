@@ -19,10 +19,12 @@ from langchain.schema import SystemMessage
 from langchain.memory import ConversationBufferWindowMemory
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains.summarize import load_summarize_chain
-from langchain import PromptTemplate
+from langchain.prompts import ChatPromptTemplate
+from langchain.prompts import PromptTemplate
+
 from bs4 import BeautifulSoup
 from pydantic import Field
-from langchain.prompts import ChatPromptTemplate
+
 import requests
 
 
@@ -32,17 +34,8 @@ load_dotenv()
 current_language = load_current_language()
 internet_access = config['INTERNET_ACCESS']
 
-# openai.api_key = os.getenv('CHIMERA_GPT_KEY')
-# openai.api_base = "https://api.naga.ac/v1"
-def sdxl(prompt):
-    response = openai.Image.create(
-    model="sdxl",
-    prompt=prompt,
-    n=1,  # images count
-    size="1024x1024"
-)
-    return response['data'][0]["url"]
-
+## To Do - Does not work
+## Add embeddings here
 def knowledge_retrieval(query):    
     # Define the data to be sent in the request
     data = {
@@ -64,6 +57,7 @@ def knowledge_retrieval(query):
     else:
         print(f"HTTP request failed with status code {response.status_code}") 
 
+## create own function to summarize
 def summary(content):
     llm = ChatOpenAI(temperature = 0, model = "gpt-3.5-turbo-16k-0613")
     text_splitter = RecursiveCharacterTextSplitter(separators=["\n\n", "\n"], chunk_size = 10000, chunk_overlap=500)
@@ -208,89 +202,7 @@ def research(query):
     results = agent.run(query)
 
     return results
-
-
-def trigger_github_weekly_trending_repo_scrape():
-    url = "https://api.browse.ai/v2/robots/0c0f94bf-207a-4660-8ade-238cd778bb25/tasks"
-
-    payload = {"inputParameters": 
-               {"originUrl": "https://github.com/trending"}
-            }
-    headers = {"Authorization": "Bearer ec2cc08b-3343-47c9-9dd3-dc5d40d4aa3b:dead067b-d485-496d-a3e0-4902339f6cfe"}
-
-    response = requests.request("POST", url, json=payload, headers=headers)
-
-    print("id: ", response.json()["result"]["id"], "is :", response.text)
-    return response.json()["result"]["id"]
-
-def retrieve_github_weekly_trending_repo(task_id):
-    url = f"https://api.browse.ai/v2/robots/0c0f94bf-207a-4660-8ade-238cd778bb25/tasks/{task_id}"
-
-    headers = {"Authorization": "Bearer ec2cc08b-3343-47c9-9dd3-dc5d40d4aa3b:dead067b-d485-496d-a3e0-4902339f6cfe"}
-
-    response = requests.request("GET", url, headers=headers)
-
-    return response.json()
-
-def get_github_weekly_trending_repo():
-    task_id = trigger_github_weekly_trending_repo_scrape()    
-
-    while True:
-        time.sleep(5)
-
-        response = retrieve_github_weekly_trending_repo(task_id)
-
-        # print(response)
-        if response["statusCode"] == 200:
-            if response["result"]["status"] == "successful":
-                repos = response["result"]["capturedLists"]
-                return repos                                 
-            elif response["result"]["status"] == "failed":
-                return "failed to get data"
-        elif response["statusCode"] in {400, 401, 403, 404, 500, 503}:
-            return response["messageCode"]
-
-def filter_ai_github_repos(repos):
-    model = ChatOpenAI()
-
-    prompt_template = """
-    {repos} 
-    Above is the list of scraped trending github repos this week, 
-    can you help me filter out ones that is related to AI, knowledge graph, computer vision, large language model?
-
-    The report should be in certain format:
-    "🚀 Daily trending AI projects:
-
-    **coqui-ai / TTS**
-    - 🌟 3,952 stars this week | 18,952 total stars
-    - 📖 a deep learning toolkit for Text-to-Speech, battle-tested in research and production
-    - 🌐 https://github.com/coqui-ai/TTS
-
-    **tldraw / tldraw**
-    - 🌟 2,196 stars this week | 20,812 total stars
-    - 📖 a very good whiteboard
-    - 🌐 https://github.com/yoheinakajima/instagraph
-
-    ...."
-
-    if there is no any relevant repo, you can just say "Looks like no new interesting AI project today, let me know if I missed any pls!"
-    """
-    prompt = ChatPromptTemplate.from_template(prompt_template)
-
-    chain = prompt | model
-
-    results = chain.invoke({"repos": repos})
-
-    return results.content
-
-def generate_trending_git_report():
-    repos = get_github_weekly_trending_repo()
-
-    filtered_repos = filter_ai_github_repos(repos)
-
-    return filtered_repos
-
-    
+ 
 async def fetch_models():
     return openai.Model.list()
     
@@ -369,91 +281,3 @@ def generate_response_old(instructions, search, history):
     )
     message = response.choices[0].message.content
     return message
-
-
-def generate_gpt4_response(prompt):
-    messages = [
-            {"role": "system", "name": "admin_user", "content": prompt},
-        ]
-    response = openai.ChatCompletion.create(
-        model='gpt-4',
-        messages=messages
-    )
-    message = response.choices[0].message.content
-    return message
-
-async def poly_image_gen(session, prompt):
-    seed = random.randint(1, 100000)
-    image_url = f"https://image.pollinations.ai/prompt/{prompt}?seed={seed}"
-    async with session.get(image_url) as response:
-        image_data = await response.read()
-        image_io = io.BytesIO(image_data)
-        return image_io
-
-# async def fetch_image_data(url):
-#     async with aiohttp.ClientSession() as session:
-#         async with session.get(url) as response:
-#             return await response.read()
-
-async def dall_e_gen(model, prompt, size, num_images):
-    response = openai.Image.create(
-        model=model,
-        prompt=prompt,
-        n=num_images,
-        size=size,
-    )
-    imagefileobjs = []
-    for image in response["data"]:
-        image_url = image["url"]
-        async with aiohttp.ClientSession() as session:
-            async with session.get(image_url) as response:
-                content = await response.content.read()
-                img_file_obj = io.BytesIO(content)
-                imagefileobjs.append(img_file_obj)
-    return imagefileobjs
-    
-
-async def generate_image_prodia(prompt, model, sampler, seed, neg):
-    print("\033[1;32m(Prodia) Creating image for :\033[0m", prompt)
-    start_time = time.time()
-    async def create_job(prompt, model, sampler, seed, neg):
-        if neg is None:
-            negative = "(nsfw:1.5),verybadimagenegative_v1.3, ng_deepnegative_v1_75t, (ugly face:0.8),cross-eyed,sketches, (worst quality:2), (low quality:2), (normal quality:2), lowres, normal quality, ((monochrome)), ((grayscale)), skin spots, acnes, skin blemishes, bad anatomy, DeepNegative, facing away, tilted head, {Multiple people}, lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worstquality, low quality, normal quality, jpegartifacts, signature, watermark, username, blurry, bad feet, cropped, poorly drawn hands, poorly drawn face, mutation, deformed, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, extra fingers, fewer digits, extra limbs, extra arms,extra legs, malformed limbs, fused fingers, too many fingers, long neck, cross-eyed,mutated hands, polar lowres, bad body, bad proportions, gross proportions, text, error, missing fingers, missing arms, missing legs, extra digit, extra arms, extra leg, extra foot, repeating hair, nsfw, [[[[[bad-artist-anime, sketch by bad-artist]]]]], [[[mutation, lowres, bad hands, [text, signature, watermark, username], blurry, monochrome, grayscale, realistic, simple background, limited palette]]], close-up, (swimsuit, cleavage, armpits, ass, navel, cleavage cutout), (forehead jewel:1.2), (forehead mark:1.5), (bad and mutated hands:1.3), (worst quality:2.0), (low quality:2.0), (blurry:2.0), multiple limbs, bad anatomy, (interlocked fingers:1.2),(interlocked leg:1.2), Ugly Fingers, (extra digit and hands and fingers and legs and arms:1.4), crown braid, (deformed fingers:1.2), (long fingers:1.2)"
-        else:
-            negative = neg
-        url = 'https://api.prodia.com/generate'
-        params = {
-            'new': 'true',
-            'prompt': f'{quote(prompt)}',
-            'model': model,
-            'negative_prompt': f"{negative}",
-            'steps': '100',
-            'cfg': '9.5',
-            'seed': f'{seed}',
-            'sampler': sampler,
-            'upscale': 'True',
-            'aspect_ratio': 'square'
-        }
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params) as response:
-                data = await response.json()
-                return data['job']
-            
-    job_id = await create_job(prompt, model, sampler, seed, neg)
-    url = f'https://api.prodia.com/job/{job_id}'
-    headers = {
-        'authority': 'api.prodia.com',
-        'accept': '*/*',
-    }
-
-    async with aiohttp.ClientSession() as session:
-        while True:
-            async with session.get(url, headers=headers) as response:
-                json = await response.json()
-                if json['status'] == 'succeeded':
-                    async with session.get(f'https://images.prodia.xyz/{job_id}.png?download=1', headers=headers) as response:
-                        content = await response.content.read()
-                        img_file_obj = io.BytesIO(content)
-                        duration = time.time() - start_time
-                        print(f"\033[1;34m(Prodia) Finished image creation\n\033[0mJob id : {job_id}  Prompt : ", prompt, "in", duration, "seconds.")
-                        return img_file_obj

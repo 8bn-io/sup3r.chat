@@ -14,11 +14,10 @@ from discord import Embed, app_commands
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 
-from bot_utilities.ai_utils import generate_response, generate_image_prodia, poly_image_gen, generate_gpt4_response, dall_e_gen, sdxl, generate_trending_git_report
-from bot_utilities.response_util import split_response, translate_to_en, get_random_prompt
+from bot_utilities.ai_utils import generate_response
+from bot_utilities.response_util import split_response, translate_to_en
 from bot_utilities.discord_util import check_token, get_discord_token
 from bot_utilities.config_loader import config, load_current_language, load_instructions
-from bot_utilities.replit_detector import detect_replit
 from bot_utilities.sanitization_utils import sanitize_prompt
 from model_enum import Model
 load_dotenv()
@@ -43,38 +42,27 @@ trigger_words = config['TRIGGER']
 smart_mention = config['SMART_MENTION']
 presences = config["PRESENCES"]
 presences_disabled = config["DISABLE_PRESENCE"]
-# Imagine config
-blacklisted_words = config['BLACKLIST_WORDS']
-prevent_nsfw = config['AI_NSFW_CONTENT_FILTER']
+
+# Check available Chat Models and create a list of them
+chat_models = []
+if 'MODELS' in config and isinstance(config['MODELS'], list):
+    for model in config['MODELS']:
+        if isinstance(model, dict) and 'id' in model:
+            chat_models.append(model['id'])
+        else:
+            print("Warning: Invalid model configuration detected.")
+else:
+    print("Error: 'MODELS' key not found or is not a list in the config.")
+
 
 ## Instructions Loader ##
 current_language = load_current_language()
 instruction = {}
 load_instructions(instruction)
 
-CHIMERA_GPT_KEY = os.getenv('CHIMERA_GPT_KEY')
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-def fetch_chat_models():
-    models = []
-    headers = {
-        'Authorization': f'Bearer {CHIMERA_GPT_KEY}',
-        'Content-Type': 'application/json'
-    }
-
-    response = requests.get('https://api.naga.ac/v1/models', headers=headers)
-    if response.status_code == 200:
-        ModelsData = response.json()
-        for model in ModelsData.get('data'):
-            if "chat" in model['endpoints'][0]:
-                models.append(model['id'])
-    else:
-        print(f"Failed to fetch chat models. Status code: {response.status_code}")
-        
-    return models
-
-chat_models = fetch_chat_models()
-model_blob = "\n".join(chat_models)
-
+print("Line65") # Debugging
 
 @bot.event
 async def on_ready():
@@ -89,11 +77,8 @@ async def on_ready():
     print(f"Invite link: {invite_link}")
     print()
     print()
-    print(f"\033[1;38;5;202mAvailable models: {model_blob}\033[0m")
+    print(f"\033[1;38;5;202mAvailable models: {chat_models}\033[0m")
     print(f"\033[1;38;5;46mCurrent model: {config['GPT_MODEL']}\033[0m")
-
-    # Start the scheduler task
-    scheduler.start()
 
     if presences_disabled:
         return
@@ -117,17 +102,18 @@ if internet_access:
 
 # Message history and config
 message_history = {}
-MAX_HISTORY = config['MAX_HISTORY']
+MAX_HISTORY = config['MAX_HISTORY'] # Max history per user per channel set via config.yml
 personaname = config['INSTRUCTIONS'].title()
 replied_messages = {}
 active_channels = {}
-scheduled_channels = {}
-channels_scheduled_tasks = {}
+
+print("Line110") # Debugging
+
 @bot.event
 async def on_message(message):
     if message.author == bot.user and message.reference:
         replied_messages[message.reference.message_id] = message
-        if len(replied_messages) > 5:
+        if len(replied_messages) > MAX_HISTORY:
             oldest_message_id = min(replied_messages.keys())
             del replied_messages[oldest_message_id]
 
@@ -191,7 +177,9 @@ async def on_message_delete(message):
         replied_to_message = replied_messages[message.id]
         await replied_to_message.delete()
         del replied_messages[message.id]
-    
+
+print("Line181") # Debugging
+
 @bot.hybrid_command(name="pfp", description=current_language["pfp"])
 @commands.is_owner()
 async def pfp(ctx, attachment: discord.Attachment):
@@ -234,31 +222,6 @@ async def toggledm(ctx):
     allow_dm = not allow_dm
     await ctx.send(f"DMs are now {'on' if allow_dm else 'off'}", delete_after=3)
 
-@bot.hybrid_command(name="schedule")
-@app_commands.choices(task=[
-    app_commands.Choice(name="Generate github reports", value="github"),
-    app_commands.Choice(name="Say hello", value="hello")
-])
-
-async def schedule_task(ctx, task: app_commands.Choice[str] = None):
-    channel_id = ctx.channel.id
-
-    if channel_id in scheduled_tasks["git-report"]:       
-       scheduled_tasks["git-report"].remove(channel_id)
-       with open("channels_scheduled_tasks.json", "w", encoding='utf-8') as f:
-            json.dump(scheduled_tasks, f, indent=4)
-       await ctx.send(f"{ctx.channel.mention} scheduled a git report has been disabled", delete_after=3)
-    else:
-        scheduled_tasks["git-report"].append(channel_id)
-        with open("channels_scheduled_tasks.json", "w", encoding='utf-8') as f:
-            json.dump(scheduled_tasks, f, indent=4)
-        await ctx.send(f"{ctx.channel.mention} scheduled a git report every day", delete_after=3)
-
-if os.path.exists("channels_scheduled_tasks.json"):
-    with open("channels_scheduled_tasks.json", "r", encoding='utf-8') as f:
-        scheduled_tasks = json.load(f)
-
-
 @bot.hybrid_command(name="toggleactive", description=current_language["toggleactive"])
 @app_commands.choices(persona=[
     app_commands.Choice(name=persona.capitalize(), value=persona)
@@ -285,6 +248,8 @@ if os.path.exists("channels.json"):
     with open("channels.json", "r", encoding='utf-8') as f:
         active_channels = json.load(f)
 
+print("Line253") # Debugging
+
 @bot.hybrid_command(name="clear", description=current_language["bonk"])
 async def clear(ctx):
     key = f"{ctx.author.id}-{ctx.channel.id}"
@@ -295,187 +260,6 @@ async def clear(ctx):
         return
     
     await ctx.send(f"Message history has been cleared", delete_after=4)
-
-
-@commands.guild_only()
-@bot.hybrid_command(name="imagine", description="Command to imagine an image")
-@app_commands.choices(sampler=[
-    app_commands.Choice(name='📏 Euler (Recommended)', value='Euler'),
-    app_commands.Choice(name='📏 Euler a', value='Euler a'),
-    app_commands.Choice(name='📐 Heun', value='Heun'),
-    app_commands.Choice(name='💥 DPM++ 2M Karras', value='DPM++ 2M Karras'),
-    app_commands.Choice(name='🔍 DDIM', value='DDIM')
-])
-@app_commands.choices(model=[
-    app_commands.Choice(name='🙂 SDXL (The best of the best)', value='sdxl'),
-    app_commands.Choice(name='🌈 Elldreth vivid mix (Landscapes, Stylized characters, nsfw)', value='ELLDRETHVIVIDMIX'),
-    app_commands.Choice(name='💪 Deliberate v2 (Anything you want, nsfw)', value='DELIBERATE'),
-    app_commands.Choice(name='🔮 Dreamshaper (HOLYSHIT this so good)', value='DREAMSHAPER_6'),
-    app_commands.Choice(name='🎼 Lyriel', value='LYRIEL_V16'),
-    app_commands.Choice(name='💥 Anything diffusion (Good for anime)', value='ANYTHING_V4'),
-    app_commands.Choice(name='🌅 Openjourney (Midjourney alternative)', value='OPENJOURNEY'),
-    app_commands.Choice(name='🏞️ Realistic (Lifelike pictures)', value='REALISTICVS_V20'),
-    app_commands.Choice(name='👨‍🎨 Portrait (For headshots I guess)', value='PORTRAIT'),
-    app_commands.Choice(name='🌟 Rev animated (Illustration, Anime)', value='REV_ANIMATED'),
-    app_commands.Choice(name='🤖 Analog', value='ANALOG'),
-    app_commands.Choice(name='🌌 AbyssOrangeMix', value='ABYSSORANGEMIX'),
-    app_commands.Choice(name='🌌 Dreamlike v1', value='DREAMLIKE_V1'),
-    app_commands.Choice(name='🌌 Dreamlike v2', value='DREAMLIKE_V2'),
-    app_commands.Choice(name='🌌 Dreamshaper 5', value='DREAMSHAPER_5'),
-    app_commands.Choice(name='🌌 MechaMix', value='MECHAMIX'),
-    app_commands.Choice(name='🌌 MeinaMix', value='MEINAMIX'),
-    app_commands.Choice(name='🌌 Stable Diffusion v14', value='SD_V14'),
-    app_commands.Choice(name='🌌 Stable Diffusion v15', value='SD_V15'),
-    app_commands.Choice(name="🌌 Shonin's Beautiful People", value='SBP'),
-    app_commands.Choice(name="🌌 TheAlly's Mix II", value='THEALLYSMIX'),
-    app_commands.Choice(name='🌌 Timeless', value='TIMELESS')
-])
-@app_commands.describe(
-    prompt="Write a amazing prompt for a image",
-    model="Model to generate image",
-    sampler="Sampler for denosing",
-    negative="Prompt that specifies what you do not want the model to generate",
-)
-@commands.guild_only()
-async def imagine(ctx, prompt: str, model: app_commands.Choice[str], sampler: app_commands.Choice[str], negative: str = None, seed: int = None):
-    for word in prompt.split():
-        if word in blacklisted_words:
-            is_nsfw = True
-        else:
-            is_nsfw = False
-    if seed is None:
-        seed = random.randint(10000, 99999)
-    await ctx.defer()
-    
-    model_uid = Model[model.value].value[0]
-    
-    if is_nsfw and not ctx.channel.nsfw:
-        await ctx.send(f"⚠️ You can create NSFW images in NSFW channels only\n To create NSFW image first create a age ristricted channel ", delete_after=30)
-        return
-    if model_uid=="sdxl":
-        imagefileobj = sdxl(prompt)
-    else:
-        imagefileobj = await generate_image_prodia(prompt, model_uid, sampler.value, seed, negative)
-    
-    if is_nsfw:
-        img_file = discord.File(imagefileobj, filename="image.png", spoiler=True, description=prompt)
-        prompt = f"||{prompt}||"
-    else:
-        img_file = discord.File(imagefileobj, filename="image.png", description=prompt)
-        
-    if is_nsfw:
-        embed = discord.Embed(color=0xFF0000)
-    else:
-        embed = discord.Embed(color=discord.Color.random())
-    embed.title = f"🎨Generated Image by {ctx.author.display_name}"
-    embed.add_field(name='📝 Prompt', value=f'- {prompt}', inline=False)
-    if negative is not None:
-        embed.add_field(name='📝 Negative Prompt', value=f'- {negative}', inline=False)
-    embed.add_field(name='🤖 Model', value=f'- {model.value}', inline=True)
-    embed.add_field(name='🧬 Sampler', value=f'- {sampler.value}', inline=True)
-    embed.add_field(name='🌱 Seed', value=f'- {str(seed)}', inline=True)
-    
-    if is_nsfw:
-        embed.add_field(name='🔞 NSFW', value=f'- {str(is_nsfw)}', inline=True)
-
-    sent_message = await ctx.send(embed=embed, file=img_file)
-
-
-@bot.hybrid_command(name="imagine-dalle", description="Create images using DALL-E")
-@commands.guild_only()
-@app_commands.choices(model=[
-     app_commands.Choice(name='SDXL', value='sdxl'),
-     app_commands.Choice(name='Kandinsky 2.2', value='kandinsky-2.2'),
-     app_commands.Choice(name='Kandinsky 2', value='kandinsky-2'),
-     app_commands.Choice(name='Dall-E', value='dall-e'),
-     app_commands.Choice(name='Stable Diffusion 2.1', value='stable-diffusion-2.1'),
-     app_commands.Choice(name='Stable Diffusion 1.5', value='stable-diffusion-1.5'),
-     app_commands.Choice(name='Deepfloyd', value='deepfloyd-if'),
-     app_commands.Choice(name='Material Diffusion', value='material-diffusion')
-])
-@app_commands.choices(size=[
-     app_commands.Choice(name='🔳 Small', value='256x256'),
-     app_commands.Choice(name='🔳 Medium', value='512x512'),
-     app_commands.Choice(name='🔳 Large', value='1024x1024')
-])
-@app_commands.describe(
-     prompt="Write a amazing prompt for a image",
-     size="Choose the size of the image"
-)
-async def imagine_dalle(ctx, prompt, model: app_commands.Choice[str], size: app_commands.Choice[str], num_images : int = 1):
-    await ctx.defer()
-    model = model.value
-    size = size.value
-    if num_images > 4:
-        num_images = 4
-    imagefileobjs = await dall_e_gen(model, prompt, size, num_images)
-    await ctx.send(f'🎨 Generated Image by {ctx.author.name}')
-    for imagefileobj in imagefileobjs:
-        file = discord.File(imagefileobj, filename="image.png", spoiler=True, description=prompt)
-        sent_message =  await ctx.send(file=file)
-        reactions = ["⬆️", "⬇️"]
-        for reaction in reactions:
-            await sent_message.add_reaction(reaction)
-
-    
-@commands.guild_only()
-@bot.hybrid_command(name="imagine-pollinations", description="Bring your imagination into reality with pollinations.ai!")
-@app_commands.describe(images="Choose the amount of your image.")
-@app_commands.describe(prompt="Provide a description of your imagination to turn them into image.")
-async def imagine_poly(ctx, *, prompt: str, images: int = 4):
-    await ctx.defer(ephemeral=True)
-    images = min(images, 18)
-    tasks = []
-    async with aiohttp.ClientSession() as session:
-        while len(tasks) < images:
-            task = asyncio.ensure_future(poly_image_gen(session, prompt))
-            tasks.append(task)
-            
-        generated_images = await asyncio.gather(*tasks)
-            
-    files = []
-    for index, image in enumerate(generated_images):
-        file = discord.File(image, filename=f"image_{index+1}.png")
-        files.append(file)
-        
-    await ctx.send(files=files, ephemeral=True)
-
-@commands.guild_only()
-@bot.hybrid_command(name="gif", description=current_language["nekos"])
-@app_commands.choices(category=[
-    app_commands.Choice(name=category.capitalize(), value=category)
-    for category in ['baka', 'bite', 'blush', 'bored', 'cry', 'cuddle', 'dance', 'facepalm', 'feed', 'handhold', 'happy', 'highfive', 'hug', 'kick', 'kiss', 'laugh', 'nod', 'nom', 'nope', 'pat', 'poke', 'pout', 'punch', 'shoot', 'shrug']
-])
-async def gif(ctx, category: app_commands.Choice[str]):
-    base_url = "https://nekos.best/api/v2/"
-
-    url = base_url + category.value
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            if response.status != 200:
-                await ctx.channel.send("Failed to fetch the image.")
-                return
-
-            json_data = await response.json()
-
-            results = json_data.get("results")
-            if not results:
-                await ctx.channel.send("No image found.")
-                return
-
-            image_url = results[0].get("url")
-
-            embed = Embed(colour=0x141414)
-            embed.set_image(url=image_url)
-            await ctx.send(embed=embed)
-            
-@bot.hybrid_command(name="askgpt4", description="Ask gpt4 a question")
-async def ask(ctx, prompt: str):
-    await ctx.defer()
-    response = await asyncio.to_thread(generate_gpt4_response, prompt=prompt)
-    for chunk in split_response(response):
-        await ctx.send(chunk, allowed_mentions=discord.AllowedMentions.none(), suppress_embeds=True)
 
 bot.remove_command("help")
 @bot.hybrid_command(name="help", description=current_language["help"])
@@ -524,40 +308,8 @@ async def server(ctx):
             embed.add_field(name=guild.name, value=f"*[No invite permission]*", inline=True)
 
     await ctx.send(embed=embed, ephemeral=True)
-    
 
-
-# Define the scheduler task
-@tasks.loop(hours=48)  # Run the task every minute
-async def scheduler():
-    current_time = datetime.datetime.now()
-    print(current_time, "; hour is: ", current_time.hour)
-
-    if os.path.exists("channels_scheduled_tasks.json"):
-        with open("channels_scheduled_tasks.json", "r", encoding='utf-8') as f:
-            scheduled_channels = json.load(f)["git-report"]
-
-            print(scheduled_channels)
-
-        if scheduled_channels:
-            report = generate_trending_git_report()
-
-            for channel_id in scheduled_channels:
-                channel = bot.get_channel(channel_id)
-                if channel:
-                    # Send the message
-                    await channel.send(report)
-
-
-        # for channel_id in scheduled_channels:
-        #     # Replace 'YOUR_CHANNEL_ID' with the actual channel ID where you want to send the message
-        #     channel = bot.get_channel("1153297683235209286")
-            
-        #     # Send the message
-        #     await channel.send('Hello!')
-            # Check if it's time to send the message (e.g., 9:00 AM)
-            # if now.hour == 9 and now.minute == 0:
-
+print('Line 309') # Debuggings
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -566,8 +318,5 @@ async def on_command_error(ctx, error):
     elif isinstance(error, commands.NotOwner):
         await ctx.send(f"{ctx.author.mention} Only the owner of the bot can use this command.")
 
-if detect_replit():
-    from bot_utilities.replit_flask_runner import run_flask_in_thread
-    run_flask_in_thread()
 if __name__ == "__main__":    
     bot.run(TOKEN)
