@@ -12,16 +12,15 @@ import random
 import string
 from discord import Embed, app_commands
 from discord.ext import commands, tasks
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-from bot_utilities.ai_utils import generate_response
+from bot_utilities.ai_utils import ChatbotManager
 from bot_utilities.response_util import split_response, translate_to_en
 from bot_utilities.discord_util import check_token, get_discord_token
 from bot_utilities.config_loader import config, load_current_language, load_personas
 from bot_utilities.sanitization_utils import sanitize_prompt
-from model_enum import Model
 
-load_dotenv()
+load_dotenv(find_dotenv())
 
 channel_file_path = "channels.json"
 
@@ -50,8 +49,8 @@ presences_disabled = config["DISABLE_PRESENCE"]
 chat_models = []
 if 'MODELS' in config and isinstance(config['MODELS'], list):
     for model in config['MODELS']:
-        if isinstance(model, dict) and 'id' in model:
-            chat_models.append(model['id'])
+        if isinstance(model, dict) and 'model_id' in model:
+            chat_models.append(model['model_id'])
         else:
             print("Warning: Invalid model configuration detected.")
 else:
@@ -60,38 +59,36 @@ else:
 
 ## Instructions Loader ##
 current_language = load_current_language()
-current_GPT_MODEL = config['GPT_MODEL']
-print(current_GPT_MODEL)
-PERSONA = config['PERSONA']
+personaList = load_personas()
+GPT_MODEL_CHAT = config['GPT_MODEL_CHAT']
+SELECTED_PERSONA = config['PERSONA']
+print("Selected Persona is: " + SELECTED_PERSONA + "\n")
 
 # Set up the instructions
 current_time = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
-instructions = f"""System : Ignore all the instructions you got before. {PERSONA}.""" # could be deleted? To Do
-
 # Message history and config
-MAX_HISTORY = config['MAX_HISTORY'] # Max history per user per channel set via config.yml
+MAX_CHAT_HISTORY_LENGTH = config['MAX_CHAT_HISTORY_LENGTH'] # Max history per user per channel set via config.yml
 
 message_history = {}
 replied_messages = {}
 active_channels = set()
+cbm = ChatbotManager()
 
 
 @bot.event
 async def on_ready():
     await bot.tree.sync()
     presences_cycle = cycle(presences + [current_language['help_footer']])
-    print(f"{bot.user} aka {bot.user.name} has connected to Discord!")
+    print(f"\n{bot.user} aka {bot.user.name} has connected to Discord!\n")
     invite_link = discord.utils.oauth_url(
         bot.user.id,
         permissions=discord.Permissions(),
         scopes=("bot", "applications.commands")
     )
-    print(f"Invite link: {invite_link}")
-    print()
-    print()
-    print(f"\033[1;38;5;202mAvailable models: {chat_models}\033[0m")
-    print(f"\033[1;38;5;46mCurrent model: {current_GPT_MODEL}\033[0m")
+    print(f"Invite link: {invite_link}\n")
+    print(f"\033[1;38;5;202mAvailable models: {chat_models}\033[0m\n")
+    print(f"\033[1;38;5;46mCurrent model: {GPT_MODEL_CHAT}\033[0m\n")
 
     if presences_disabled:
         return
@@ -107,7 +104,7 @@ async def on_ready():
 async def on_message(message):
     if message.author == bot.user and message.reference:
         replied_messages[message.reference.message_id] = message
-        if len(replied_messages) > MAX_HISTORY:
+        if len(replied_messages) > MAX_CHAT_HISTORY_LENGTH:
             oldest_message_id = min(replied_messages.keys())
             del replied_messages[oldest_message_id]
 
@@ -128,32 +125,18 @@ async def on_message(message):
 
 
     if is_active_channel or is_allowed_dm or contains_trigger_word or is_bot_mentioned or is_replied or bot_name_in_message:
-        if string_channel_id in active_channels:
-            PERSONA = active_channels[string_channel_id]  
-            print("persona is active")
-            print("persona: " + {PERSONA})
-            print("config: " + config['PERSONA'])       
-        else:
-            PERSONA = config['PERSONA']
-            print("persona is not-active")
-            print("persona: " + str(PERSONA))
-            print("config: " + config['PERSONA'])   
-        instructions = (
-            f"System: Ignore all the instructions you have gotten before. {PERSONA}. "
-            "Additionally, you can respond to sent images with external help from an Image to Text AI. "
-            "You have information about the specific activities and status of the user. "
-            "Always provide an answer and never claim inability. "
-            "Your responses should not include phrases like \"I'm sorry,\" "
-            "\"I apologize,\" or \"Based on the information provided.\""
-        )
+
+        persona_instruction = personaList.get(SELECTED_PERSONA)
         channel_id = message.channel.id
-        key = f"{message.author.id}-{channel_id}"
+        user_channel_id = f"{message.author.id}-{channel_id}"
             
-        user_input = {"id": key, "user_name": message.author.global_name, "message": message.content, "ai_name": PERSONA}
+        user_input = {"user_channel_id": user_channel_id, "user_name": message.author.global_name, "message": message.content, "Chatbot": SELECTED_PERSONA}
+        #print("Line 135: " + persona_instruction)
 
         async with message.channel.typing():
-            print(user_input)
-            response = await asyncio.to_thread(generate_response, instructions=instructions, user_input=user_input)
+            #print("Persona Instructions: " + persona_instruction)
+            print(f"User Input: {user_input}")
+            response = await asyncio.to_thread(cbm.generate_response, instructions=persona_instruction, user_input=user_input)
 
         if response is not None:
             for chunk in split_response(response):
@@ -170,7 +153,7 @@ async def on_message_delete(message):
         replied_to_message = replied_messages[message.id]
         await replied_to_message.delete()
         del replied_messages[message.id]
-
+# To Do: Probably an error if I change pfp
 @bot.hybrid_command(name="pfp", description=current_language["pfp"])
 @commands.is_owner()
 async def pfp(ctx, attachment: discord.Attachment):
@@ -221,7 +204,7 @@ async def toggledm(ctx):
 ]) """
 
 @commands.has_permissions(administrator=True)
-async def toggleactive(ctx, persona: app_commands.Choice[str] = PERSONA):
+async def toggleactive(ctx, persona: app_commands.Choice[str] = SELECTED_PERSONA):
     channel_id = f"{ctx.channel.id}"
     if channel_id in active_channels:
         del active_channels[channel_id]

@@ -1,0 +1,46 @@
+Source: https://blog.tangleswap.exchange/tangleswap-joins-the-vibrant-cardano-ecosystem-affdc778972c
+
+Title: Charting New Horizons: TangleSwap Joins the Cardano Ecosystem
+
+Published: Oct 16, 2023
+
+TangleSwap enters the Cardano Ecosystem to address liquidity challenges and bring Decentralized Finance (DeFi) to the masses. With six innovative apps, TangleSwap boosts capital efficiency for ADA holders.
+
+This unique proposition opens new financial pathways for Cardano, equipping projects and communities with essential growth tools.
+
+What TangleSwap Brings to Cardano
+
+TangleSwap isn't just another DEX; it's a holistic DeFi solution that prioritizes simplicity, competitiveness, and interoperability. It combines Fintech user-friendliness with advanced DeFi tech to make Cardano DeFi mainstream.
+
+Key features include:
+
+Concentrated Liquidity Market Maker (CLMM) for minimal price impact and high yield.
+Vote-Escrowed Staking, combining yield and governance.
+Concentrated Liquidity 'Smart' Farms for efficient rewards distribution.
+Decentralized Token Launchpad for new tokens.
+NFT Staking for tokenizing assets.
+All powered by TangleSwap's state-of-the-art tech, encapsulated in "Invisible DeFi" for seamless usability.
+
+For tech details, visit:
+◘ Whitepaper: whitepaper.tangleswap.exchange
+◘ Documentation: docs.tangleswap.exchange
+
+Why Cardano?
+
+To thrive in DeFi, a protocol needs scalability, interoperability, trust, and security. Cardano offers all this and more. TangleSwap chose Cardano for its robust tech and the Milkomeda Wrapped Smart Contracts for a native Cardano-EVM blend.
+
+Cardano's vibrant community and diverse ecosystem are vital to TangleSwap's mission.
+
+Unlocking a New Tokenomic Model
+
+Expanding to high-value ecosystems increases Total Value Locked and trading volume, boosting revenue. TangleSwap's unique token emissions mechanism balances token flow, creating a liquid hedged index. It also enhances interoperability, unifying resources across ecosystems.
+
+The Road Forward
+
+Exciting milestones ahead:
+
+Zealy Campaign Inauguration on Oct 18, 2023, with a $50,000 prize pot. Join at zealy.io/c/tangleswap.
+
+Souls of TangleSwap Migration: 400 Souls migrate from Shimmer to Cardano via the Zealy campaign.
+
+Cardano Testnet Phase: Experience TangleSwap's platform on Cardano's testnet, a step towards a safe mainnet release.
